@@ -10576,7 +10576,9 @@ Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__states_Boot__ = __webpack_require__(/*! ./states/Boot */ 336);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_4__states_Splash__ = __webpack_require__(/*! ./states/Splash */ 337);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_5__states_Game__ = __webpack_require__(/*! ./states/Game */ 339);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_6__config__ = __webpack_require__(/*! ./config */ 341);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_6__states_GameOver__ = __webpack_require__(/*! ./states/GameOver */ 345);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_7__config__ = __webpack_require__(/*! ./config */ 341);
+
 
 
 
@@ -10590,14 +10592,15 @@ Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
 class Game extends __WEBPACK_IMPORTED_MODULE_2_phaser___default.a.Game {
   constructor() {
     const docElement = document.documentElement;
-    const width = docElement.clientWidth > __WEBPACK_IMPORTED_MODULE_6__config__["a" /* default */].gameWidth ? __WEBPACK_IMPORTED_MODULE_6__config__["a" /* default */].gameWidth : docElement.clientWidth;
-    const height = docElement.clientHeight > __WEBPACK_IMPORTED_MODULE_6__config__["a" /* default */].gameHeight ? __WEBPACK_IMPORTED_MODULE_6__config__["a" /* default */].gameHeight : docElement.clientHeight;
+    const width = docElement.clientWidth > __WEBPACK_IMPORTED_MODULE_7__config__["a" /* default */].gameWidth ? __WEBPACK_IMPORTED_MODULE_7__config__["a" /* default */].gameWidth : docElement.clientWidth;
+    const height = docElement.clientHeight > __WEBPACK_IMPORTED_MODULE_7__config__["a" /* default */].gameHeight ? __WEBPACK_IMPORTED_MODULE_7__config__["a" /* default */].gameHeight : docElement.clientHeight;
 
     super(width, height, __WEBPACK_IMPORTED_MODULE_2_phaser___default.a.WEBGL, 'content', null, false, false);
 
     this.state.add('Boot', __WEBPACK_IMPORTED_MODULE_3__states_Boot__["a" /* default */], false);
     this.state.add('Splash', __WEBPACK_IMPORTED_MODULE_4__states_Splash__["a" /* default */], false);
     this.state.add('Game', __WEBPACK_IMPORTED_MODULE_5__states_Game__["a" /* default */], false);
+    this.state.add('GameOver', __WEBPACK_IMPORTED_MODULE_6__states_GameOver__["a" /* default */], false);
 
     // with Cordova with need to wait that the device is ready so we will call the Boot state in another file
     if (!window.cordova) {
@@ -10762,11 +10765,21 @@ const centerGameObjects = objects => {
 
 
 
+const RUN_VELOCITY_X = 550;
+const JUMP_VELOCITY_X = 350;
+const JUMP_VELOCITY_Y = -450;
+const STAMINA_PER_SECOND_DECREASE = 10;
+const COBRA_UP_STAMINA = 50;
+const COBRA_UP_TOXICITY = 25;
+const JEBROA_UP_STAMINA = 15;
+const HIVE_DOWN_TOXICITY = 50;
+
 /* harmony default export */ __webpack_exports__["a"] = (class extends __WEBPACK_IMPORTED_MODULE_0_phaser___default.a.State {
   init() {}
   preload() {}
 
   create() {
+    this.game.score = 0;
     this.game.antialias = false;
     this.game.physics.startSystem(__WEBPACK_IMPORTED_MODULE_0_phaser___default.a.Physics.ARCADE);
 
@@ -10800,22 +10813,27 @@ const centerGameObjects = objects => {
     this.game.physics.enable(this.badger, __WEBPACK_IMPORTED_MODULE_0_phaser___default.a.Physics.ARCADE);
     this.badger.body.gravity.y = 960;
 
-    game.time.events.loop(__WEBPACK_IMPORTED_MODULE_0_phaser___default.a.Timer.SECOND, this.decreaseStamina.bind(this), this);
+    game.time.events.loop(__WEBPACK_IMPORTED_MODULE_0_phaser___default.a.Timer.SECOND, this.calculateStaminaAndScore.bind(this), this);
 
     this.createNewSection();
   }
 
   callGameOver() {
-    this.state.start('Splash');
+    this.state.start('GameOver');
   }
 
-  decreaseStamina() {
+  calculateStaminaAndScore() {
     this.badger.stamina -= 10;
+    this.game.score += 1;
     this.badger.stamina = this.badger.stamina < 0 ? 0 : this.badger.stamina;
     if (this.badger.stamina === 0) {
       this.callGameOver();
     }
     this.staminaText.setText(`Stamina: ${this.badger.stamina}`);
+  }
+
+  getProceduralPoisionX(minX, maxX, ground) {
+    return game.rnd.between(minX, maxX);
   }
 
   createNewSection(lastSection = 0) {
@@ -10834,10 +10852,11 @@ const centerGameObjects = objects => {
 
     // Do not run procedural generation for the first section
     if (lastSection) {
-      this.createWall(game.rnd.between(positionX, positionX + ground.width), ground);
-      this.createCobra(game.rnd.between(positionX, positionX + ground.width), ground);
-      this.createJerboa(game.rnd.between(positionX, positionX + ground.width), ground);
-      this.createHive(game.rnd.between(positionX, positionX + ground.width), ground);
+      const newGroundRange = [positionX, positionX + ground.width];
+      // this.createWall(this.getProceduralPoisionX(...newGroundRange), ground)
+      this.createCobra(this.getProceduralPoisionX(...newGroundRange), ground);
+      this.createJerboa(this.getProceduralPoisionX(...newGroundRange), ground);
+      this.createHive(this.getProceduralPoisionX(...newGroundRange), ground);
     }
   }
 
@@ -10860,25 +10879,33 @@ const centerGameObjects = objects => {
   }
 
   createHive(positionX, ground) {
-    let hive = this.food.create(positionX, ground.position.y - 105, 'hive');
+    let hive = this.food.create(positionX, ground.position.y - 125, 'hive');
     ground.proceduralObjects.hives.push(positionX);
     hive.body.immovable = true;
   }
 
+  handleHitWall(badger, wall) {
+    if (game.physics.arcade.getOverlapX(badger.body, wall.body)) {
+      this.callGameOver();
+    }
+  }
+
   eatSomeFood(badger, food) {
-    food.kill();
-    badger.stamina += 10;
-    badger.stamina = badger.stamina > 100 ? 100 : badger.stamina;
     if (food.key === 'cobra') {
-      badger.toxication += 25;
+      badger.stamina += COBRA_UP_STAMINA;
+      badger.toxication += COBRA_UP_TOXICITY;
+    }
+    if (food.key === 'jebroa') {
+      badger.stamina += JEBROA_UP_STAMINA;
     }
     if (food.key === 'hive') {
-      badger.toxication -= 50;
-      badger.toxication = badger.toxication < 0 ? 0 : badger.toxication;
-      if (badger.toxication >= 100) {
-        badger.toxication = 100;
-        this.callGameOver();
-      }
+      badger.toxication -= HIVE_DOWN_TOXICITY;
+    }
+    food.kill();
+    badger.stamina = badger.stamina > 100 ? 100 : badger.stamina;
+    badger.toxication = badger.toxication < 0 ? 0 : badger.toxication;
+    if (badger.toxication >= 100) {
+      this.callGameOver();
     }
     this.staminaText.setText(`Stamina: ${badger.stamina}`);
     this.toxicationText.setText(`Toxication: ${badger.toxication}`);
@@ -10887,23 +10914,30 @@ const centerGameObjects = objects => {
   update() {
     const cursors = game.input.keyboard.createCursorKeys();
     const hitPlatform = game.physics.arcade.collide(this.badger, this.platforms);
-    const hitWall = game.physics.arcade.collide(this.badger, this.walls);
-
-    // console.log(this.timer.duration);
-    // this.timer.elapsedSecondsSince()
+    // const hitWall = game.physics.arcade.collide(this.badger, this.walls);
 
     // Badger is always hungry
     game.physics.arcade.overlap(this.badger, this.food, this.eatSomeFood, null, this);
+
+    // Badger don't like walls
+    game.physics.arcade.overlap(this.badger, this.walls, this.handleHitWall, null, this);
 
     // Infinite world
     this.world.setBounds(this.badger.xChange, 0, this.game.width + this.badger.xChange, this.game.height);
 
     // Run badger run
-    this.badger.body.velocity.x = 350;
+    if (hitPlatform) {
+      if (this.badger.body.velocity.x !== RUN_VELOCITY_X) {
+        this.add.tween(this.badger.body.velocity).to({ x: RUN_VELOCITY_X }, 300, __WEBPACK_IMPORTED_MODULE_0_phaser___default.a.Easing.Linear.None, true);
+      } else {
+        this.badger.body.velocity.x = RUN_VELOCITY_X;
+      }
+    }
 
     // Jump or accelerate
     if (cursors.up.isDown && this.badger.body.touching.down && hitPlatform) {
-      this.badger.body.velocity.y = -450;
+      this.badger.body.velocity.y = JUMP_VELOCITY_Y;
+      this.add.tween(this.badger.body.velocity).to({ x: JUMP_VELOCITY_X }, 300, __WEBPACK_IMPORTED_MODULE_0_phaser___default.a.Easing.Linear.None, true);
     }
 
     const lastSection = this.platforms.children[this.platforms.children.length - 1];
@@ -10963,6 +10997,37 @@ const centerGameObjects = objects => {
   }
   update() {
     this.xChange += this.deltaX;
+  }
+});
+
+/***/ }),
+/* 344 */,
+/* 345 */
+/*!********************************!*\
+  !*** ./src/states/GameOver.js ***!
+  \********************************/
+/*! exports provided: default */
+/*! exports used: default */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0_phaser__ = __webpack_require__(/*! phaser */ 46);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0_phaser___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_0_phaser__);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__utils__ = __webpack_require__(/*! ../utils */ 338);
+
+
+
+/* harmony default export */ __webpack_exports__["a"] = (class extends __WEBPACK_IMPORTED_MODULE_0_phaser___default.a.State {
+  create() {
+    let style = {
+      fill: '#000',
+      fontSize: '32px'
+    };
+    let text = this.game.add.text(0, 0, `Your Score: 123`, style);
+    this.game.input.keyboard.onDownCallback = e => {
+      this.state.start('Game');
+      this.game.input.keyboard.onDownCallback = false;
+    };
   }
 });
 
