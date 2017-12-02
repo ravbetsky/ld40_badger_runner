@@ -10717,6 +10717,9 @@ if (window.cordova) {
     this.load.image('ground', 'assets/images/ground.png');
     this.load.image('sky', 'assets/images/sky.png');
     this.load.image('wall', 'assets/images/wall.png');
+    this.load.image('cobra', 'assets/images/cobra.png');
+    this.load.image('hive', 'assets/images/hive.png');
+    this.load.image('jerboa', 'assets/images/tushk.png');
   }
 
   create() {
@@ -10776,6 +10779,9 @@ const centerGameObjects = objects => {
     this.walls = game.add.group();
     this.walls.enableBody = true;
 
+    this.food = game.add.group();
+    this.food.enableBody = true;
+
     this.badger = new __WEBPACK_IMPORTED_MODULE_1__sprites_Badger__["a" /* default */]({
       game: this.game,
       x: this.world.left + 100,
@@ -10814,6 +10820,9 @@ const centerGameObjects = objects => {
     // Do not run procedural generation for the first section
     if (lastSection) {
       this.createWall(game.rnd.between(positionX, positionX + ground.width), ground);
+      this.createCobra(game.rnd.between(positionX, positionX + ground.width), ground);
+      this.createJerboa(game.rnd.between(positionX, positionX + ground.width), ground);
+      this.createHive(game.rnd.between(positionX, positionX + ground.width), ground);
     }
   }
 
@@ -10821,6 +10830,24 @@ const centerGameObjects = objects => {
     let wall = this.walls.create(positionX, ground.position.y - 55, 'wall');
     ground.proceduralObjects.walls.push(positionX);
     wall.body.immovable = true;
+  }
+
+  createCobra(positionX, ground) {
+    let cobra = this.food.create(positionX, ground.position.y - 55, 'cobra');
+    ground.proceduralObjects.cobras.push(positionX);
+    cobra.body.immovable = true;
+  }
+
+  createJerboa(positionX, ground) {
+    let jerboa = this.food.create(positionX, ground.position.y - 15, 'jerboa');
+    ground.proceduralObjects.jerboas.push(positionX);
+    jerboa.body.immovable = true;
+  }
+
+  createHive(positionX, ground) {
+    let hive = this.food.create(positionX, ground.position.y - 105, 'hive');
+    ground.proceduralObjects.hives.push(positionX);
+    hive.body.immovable = true;
   }
 
   update() {

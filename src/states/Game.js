@@ -19,6 +19,9 @@ export default class extends Phaser.State {
     this.walls = game.add.group();
     this.walls.enableBody = true;
 
+    this.food = game.add.group();
+    this.food.enableBody = true;
+
     this.badger = new Badger({
       game: this.game,
       x: this.world.left + 100,
@@ -57,6 +60,9 @@ export default class extends Phaser.State {
     // Do not run procedural generation for the first section
     if(lastSection) {
       this.createWall(game.rnd.between(positionX, positionX + ground.width), ground)
+      this.createCobra(game.rnd.between(positionX, positionX + ground.width), ground)
+      this.createJerboa(game.rnd.between(positionX, positionX + ground.width), ground)
+      this.createHive(game.rnd.between(positionX, positionX + ground.width), ground)
     }
   }
 
@@ -64,6 +70,24 @@ export default class extends Phaser.State {
     let wall = this.walls.create(positionX, ground.position.y - 55, 'wall');
     ground.proceduralObjects.walls.push(positionX)
     wall.body.immovable = true;
+  }
+
+  createCobra(positionX, ground) {
+    let cobra = this.food.create(positionX, ground.position.y - 55, 'cobra');
+    ground.proceduralObjects.cobras.push(positionX)
+    cobra.body.immovable = true;
+  }
+
+  createJerboa(positionX, ground) {
+    let jerboa = this.food.create(positionX, ground.position.y - 15, 'jerboa');
+    ground.proceduralObjects.jerboas.push(positionX)
+    jerboa.body.immovable = true;
+  }
+
+  createHive(positionX, ground) {
+    let hive = this.food.create(positionX, ground.position.y - 105, 'hive');
+    ground.proceduralObjects.hives.push(positionX)
+    hive.body.immovable = true;
   }
 
   update() {

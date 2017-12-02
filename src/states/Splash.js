@@ -17,6 +17,9 @@ export default class extends Phaser.State {
     this.load.image('ground', 'assets/images/ground.png')
     this.load.image('sky', 'assets/images/sky.png')
     this.load.image('wall', 'assets/images/wall.png')
+    this.load.image('cobra', 'assets/images/cobra.png')
+    this.load.image('hive', 'assets/images/hive.png')
+    this.load.image('jerboa', 'assets/images/tushk.png')
   }
 
   create () {
