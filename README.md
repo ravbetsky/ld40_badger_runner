@@ -1,1 +1,2 @@
-# ld40_badger_runner
+# Бегущий медоед.
+```yarn && npm run dev``` 
