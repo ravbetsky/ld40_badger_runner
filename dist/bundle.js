@@ -10710,7 +10710,7 @@ if (window.cordova) {
   preload() {
     this.loaderBg = this.add.sprite(this.game.world.centerX, this.game.world.centerY, 'loaderBg');
     this.loaderBar = this.add.sprite(this.game.world.centerX, this.game.world.centerY, 'loaderBar');
-    Object(__WEBPACK_IMPORTED_MODULE_1__utils__["a" /* centerGameObjects */])([this.loaderBg, this.loaderBar]);
+    Object(__WEBPACK_IMPORTED_MODULE_1__utils__["b" /* centerGameObjects */])([this.loaderBg, this.loaderBar]);
 
     this.load.setPreloadSprite(this.loaderBar);
     //
@@ -10735,8 +10735,8 @@ if (window.cordova) {
 /*!**********************!*\
   !*** ./src/utils.js ***!
   \**********************/
-/*! exports provided: centerGameObjects */
-/*! exports used: centerGameObjects */
+/*! exports provided: centerGameObjects, ProceduralManager */
+/*! exports used: ProceduralManager, centerGameObjects */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -10745,8 +10745,35 @@ const centerGameObjects = objects => {
     object.anchor.setTo(0.5);
   });
 };
-/* harmony export (immutable) */ __webpack_exports__["a"] = centerGameObjects;
+/* harmony export (immutable) */ __webpack_exports__["b"] = centerGameObjects;
 
+
+class ProceduralManager {
+  constructor(...args) {
+    this.manager = {};
+    args.forEach(arg => {
+      this.manager[arg] = {
+        latestSection: 0
+      };
+    });
+  }
+  setLatestSection(key, index) {
+    this.manager[key].latestSection = index;
+  }
+  isAllowedToCreate(key, minInterval, maxInterval, index) {
+    const currentLatest = this.manager[key].latestSection;
+    if (maxInterval === index - currentLatest) {
+      return true;
+    } else if (minInterval <= index - currentLatest) {
+      return Math.round(Math.random());
+    }
+    return false;
+  }
+}
+/* harmony export (immutable) */ __webpack_exports__["a"] = ProceduralManager;
+
+
+// export ProceduralManager;
 
 /***/ }),
 /* 339 */
@@ -10761,7 +10788,9 @@ const centerGameObjects = objects => {
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0_phaser__ = __webpack_require__(/*! phaser */ 46);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0_phaser___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_0_phaser__);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__sprites_Badger__ = __webpack_require__(/*! ../sprites/Badger */ 343);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__utils__ = __webpack_require__(/*! ../utils */ 338);
 /* globals __DEV__ */
+
 
 
 
@@ -10773,6 +10802,7 @@ const COBRA_UP_STAMINA = 50;
 const COBRA_UP_TOXICITY = 25;
 const JEBROA_UP_STAMINA = 15;
 const HIVE_DOWN_TOXICITY = 50;
+const WALL_BIOS_OVERLAP = 2;
 
 /* harmony default export */ __webpack_exports__["a"] = (class extends __WEBPACK_IMPORTED_MODULE_0_phaser___default.a.State {
   init() {}
@@ -10782,6 +10812,8 @@ const HIVE_DOWN_TOXICITY = 50;
     this.game.score = 0;
     this.game.antialias = false;
     this.game.physics.startSystem(__WEBPACK_IMPORTED_MODULE_0_phaser___default.a.Physics.ARCADE);
+
+    this.procData = new __WEBPACK_IMPORTED_MODULE_2__utils__["a" /* ProceduralManager */]('walls', 'jerboas', 'hives', 'cobras');
 
     let sky = this.game.add.sprite(0, 0, 'sky');
     sky.fixedToCamera = true;
@@ -10833,7 +10865,15 @@ const HIVE_DOWN_TOXICITY = 50;
   }
 
   getProceduralPoisionX(minX, maxX, ground) {
-    return game.rnd.between(minX, maxX);
+    // TODO: поиск наилучшей позиции удовлетворяющей условиям отображения объекта
+    return game.rnd.between(minX + 100, maxX - 100);
+  }
+
+  generateProcedural(newGroundRange, ground) {
+    this.createWall(this.getProceduralPoisionX(...newGroundRange), ground);
+    this.createCobra(this.getProceduralPoisionX(...newGroundRange), ground);
+    this.createJerboa(this.getProceduralPoisionX(...newGroundRange), ground);
+    this.createHive(this.getProceduralPoisionX(...newGroundRange), ground);
   }
 
   createNewSection(lastSection = 0) {
@@ -10853,41 +10893,54 @@ const HIVE_DOWN_TOXICITY = 50;
     // Do not run procedural generation for the first section
     if (lastSection) {
       const newGroundRange = [positionX, positionX + ground.width];
-      // this.createWall(this.getProceduralPoisionX(...newGroundRange), ground)
-      this.createCobra(this.getProceduralPoisionX(...newGroundRange), ground);
-      this.createJerboa(this.getProceduralPoisionX(...newGroundRange), ground);
-      this.createHive(this.getProceduralPoisionX(...newGroundRange), ground);
+      this.generateProcedural(newGroundRange, ground);
     }
   }
 
   createWall(positionX, ground) {
-    let wall = this.walls.create(positionX, ground.position.y - 55, 'wall');
-    ground.proceduralObjects.walls.push(positionX);
-    wall.body.immovable = true;
+    const lastSectionIndex = this.platforms.children.length - 1;
+    if (this.procData.isAllowedToCreate('walls', 1, 3, lastSectionIndex)) {
+      let wall = this.walls.create(positionX, ground.position.y - 55, 'wall');
+      ground.proceduralObjects.walls.push(positionX);
+      wall.body.setSize(wall.body.width, wall.body.height, 0, 25);
+      wall.body.immovable = true;
+      this.procData.setLatestSection('walls', lastSectionIndex);
+    }
   }
 
   createCobra(positionX, ground) {
-    let cobra = this.food.create(positionX, ground.position.y - 55, 'cobra');
-    ground.proceduralObjects.cobras.push(positionX);
-    cobra.body.immovable = true;
+    const lastSectionIndex = this.platforms.children.length - 1;
+    if (this.procData.isAllowedToCreate('cobras', 1, 4, lastSectionIndex)) {
+      const lastSectionIndex = this.platforms.children.length - 1;
+      let cobra = this.food.create(positionX, ground.position.y - 55, 'cobra');
+      ground.proceduralObjects.cobras.push(positionX);
+      cobra.body.immovable = true;
+      this.procData.setLatestSection('cobras', lastSectionIndex);
+    }
   }
 
   createJerboa(positionX, ground) {
-    let jerboa = this.food.create(positionX, ground.position.y - 15, 'jerboa');
-    ground.proceduralObjects.jerboas.push(positionX);
-    jerboa.body.immovable = true;
+    const lastSectionIndex = this.platforms.children.length - 1;
+    if (this.procData.isAllowedToCreate('jerboas', 1, 2, lastSectionIndex)) {
+      let jerboa = this.food.create(positionX, ground.position.y - 15, 'jerboa');
+      ground.proceduralObjects.jerboas.push(positionX);
+      jerboa.body.immovable = true;
+      this.procData.setLatestSection('jerboas', lastSectionIndex);
+    }
   }
 
   createHive(positionX, ground) {
-    let hive = this.food.create(positionX, ground.position.y - 125, 'hive');
-    ground.proceduralObjects.hives.push(positionX);
-    hive.body.immovable = true;
+    const lastSectionIndex = this.platforms.children.length - 1;
+    if (this.procData.isAllowedToCreate('hives', 3, 7, lastSectionIndex)) {
+      let hive = this.food.create(positionX, ground.position.y - 125, 'hive');
+      ground.proceduralObjects.hives.push(positionX);
+      hive.body.immovable = true;
+      this.procData.setLatestSection('hives', lastSectionIndex);
+    }
   }
 
   handleHitWall(badger, wall) {
-    if (game.physics.arcade.getOverlapX(badger.body, wall.body)) {
-      this.callGameOver();
-    }
+    this.callGameOver();
   }
 
   eatSomeFood(badger, food) {
@@ -10914,7 +10967,6 @@ const HIVE_DOWN_TOXICITY = 50;
   update() {
     const cursors = game.input.keyboard.createCursorKeys();
     const hitPlatform = game.physics.arcade.collide(this.badger, this.platforms);
-    // const hitWall = game.physics.arcade.collide(this.badger, this.walls);
 
     // Badger is always hungry
     game.physics.arcade.overlap(this.badger, this.food, this.eatSomeFood, null, this);
@@ -11013,8 +11065,6 @@ const HIVE_DOWN_TOXICITY = 50;
 "use strict";
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0_phaser__ = __webpack_require__(/*! phaser */ 46);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0_phaser___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_0_phaser__);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__utils__ = __webpack_require__(/*! ../utils */ 338);
-
 
 
 /* harmony default export */ __webpack_exports__["a"] = (class extends __WEBPACK_IMPORTED_MODULE_0_phaser___default.a.State {
@@ -11022,8 +11072,8 @@ const HIVE_DOWN_TOXICITY = 50;
     let style = {
       fill: '#000',
       fontSize: '32px'
-    };
-    let text = this.game.add.text(0, 0, `Your Score: 123`, style);
+      // let text = this.game.add.text(0, 0, `Your Score: ${this.game.score}`, style)
+    };console.log(`Your Score: ${this.game.score}`);
     this.game.input.keyboard.onDownCallback = e => {
       this.state.start('Game');
       this.game.input.keyboard.onDownCallback = false;

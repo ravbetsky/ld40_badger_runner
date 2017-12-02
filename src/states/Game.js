@@ -1,6 +1,7 @@
 /* globals __DEV__ */
 import Phaser from 'phaser'
 import Badger from '../sprites/Badger'
+import { ProceduralManager } from '../utils'
 
 const RUN_VELOCITY_X = 550;
 const JUMP_VELOCITY_X = 350;
@@ -10,6 +11,7 @@ const COBRA_UP_STAMINA = 50;
 const COBRA_UP_TOXICITY = 25;
 const JEBROA_UP_STAMINA = 15;
 const HIVE_DOWN_TOXICITY = 50;
+const WALL_BIOS_OVERLAP = 2;
 
 export default class extends Phaser.State {
   init() {}
@@ -19,6 +21,8 @@ export default class extends Phaser.State {
     this.game.score = 0
     this.game.antialias = false
     this.game.physics.startSystem(Phaser.Physics.ARCADE)
+
+    this.procData = new ProceduralManager('walls', 'jerboas', 'hives', 'cobras')
 
     let sky = this.game.add.sprite(0, 0, 'sky');
     sky.fixedToCamera = true;
@@ -70,7 +74,15 @@ export default class extends Phaser.State {
   }
 
   getProceduralPoisionX(minX, maxX, ground) {
-    return game.rnd.between(minX, maxX)
+    // TODO: поиск наилучшей позиции удовлетворяющей условиям отображения объекта
+    return game.rnd.between(minX + 100, maxX - 100)
+  }
+
+  generateProcedural(newGroundRange, ground) {
+    this.createWall(this.getProceduralPoisionX(...newGroundRange), ground)
+    this.createCobra(this.getProceduralPoisionX(...newGroundRange), ground)
+    this.createJerboa(this.getProceduralPoisionX(...newGroundRange), ground)
+    this.createHive(this.getProceduralPoisionX(...newGroundRange), ground)
   }
 
   createNewSection(lastSection = 0) {
@@ -90,41 +102,54 @@ export default class extends Phaser.State {
     // Do not run procedural generation for the first section
     if(lastSection) {
       const newGroundRange = [positionX, positionX + ground.width]
-      // this.createWall(this.getProceduralPoisionX(...newGroundRange), ground)
-      this.createCobra(this.getProceduralPoisionX(...newGroundRange), ground)
-      this.createJerboa(this.getProceduralPoisionX(...newGroundRange), ground)
-      this.createHive(this.getProceduralPoisionX(...newGroundRange), ground)
+      this.generateProcedural(newGroundRange, ground)
     }
   }
 
   createWall(positionX, ground) {
-    let wall = this.walls.create(positionX, ground.position.y - 55, 'wall');
-    ground.proceduralObjects.walls.push(positionX)
-    wall.body.immovable = true;
+    const lastSectionIndex = this.platforms.children.length - 1;
+    if(this.procData.isAllowedToCreate('walls', 1, 3, lastSectionIndex)) {
+      let wall = this.walls.create(positionX, ground.position.y - 55, 'wall');
+      ground.proceduralObjects.walls.push(positionX)
+      wall.body.setSize(wall.body.width, wall.body.height, 0, 25)
+      wall.body.immovable = true;
+      this.procData.setLatestSection('walls', lastSectionIndex)
+    }
   }
 
   createCobra(positionX, ground) {
-    let cobra = this.food.create(positionX, ground.position.y - 55, 'cobra');
-    ground.proceduralObjects.cobras.push(positionX)
-    cobra.body.immovable = true;
+    const lastSectionIndex = this.platforms.children.length - 1;
+    if(this.procData.isAllowedToCreate('cobras', 1, 4, lastSectionIndex)) {
+      const lastSectionIndex = this.platforms.children.length - 1;
+      let cobra = this.food.create(positionX, ground.position.y - 55, 'cobra');
+      ground.proceduralObjects.cobras.push(positionX)
+      cobra.body.immovable = true;
+      this.procData.setLatestSection('cobras', lastSectionIndex)
+    }
   }
 
   createJerboa(positionX, ground) {
-    let jerboa = this.food.create(positionX, ground.position.y - 15, 'jerboa');
-    ground.proceduralObjects.jerboas.push(positionX)
-    jerboa.body.immovable = true;
+    const lastSectionIndex = this.platforms.children.length - 1;
+    if(this.procData.isAllowedToCreate('jerboas', 1, 2, lastSectionIndex)) {
+      let jerboa = this.food.create(positionX, ground.position.y - 15, 'jerboa');
+      ground.proceduralObjects.jerboas.push(positionX)
+      jerboa.body.immovable = true;
+      this.procData.setLatestSection('jerboas', lastSectionIndex)
+    }
   }
 
   createHive(positionX, ground) {
-    let hive = this.food.create(positionX, ground.position.y - 125, 'hive');
-    ground.proceduralObjects.hives.push(positionX)
-    hive.body.immovable = true;
+    const lastSectionIndex = this.platforms.children.length - 1;
+    if(this.procData.isAllowedToCreate('hives', 3, 7, lastSectionIndex)) {
+      let hive = this.food.create(positionX, ground.position.y - 125, 'hive');
+      ground.proceduralObjects.hives.push(positionX)
+      hive.body.immovable = true;
+      this.procData.setLatestSection('hives', lastSectionIndex)
+    }
   }
 
   handleHitWall(badger, wall) {
-    if(game.physics.arcade.getOverlapX(badger.body, wall.body)) {
-      this.callGameOver()
-    }
+    this.callGameOver()
   }
 
   eatSomeFood(badger, food) {
@@ -151,7 +176,6 @@ export default class extends Phaser.State {
   update() {
     const cursors = game.input.keyboard.createCursorKeys();
     const hitPlatform = game.physics.arcade.collide(this.badger, this.platforms);
-    // const hitWall = game.physics.arcade.collide(this.badger, this.walls);
 
     // Badger is always hungry
     game.physics.arcade.overlap(this.badger, this.food, this.eatSomeFood, null, this);
