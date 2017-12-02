@@ -10800,7 +10800,22 @@ const centerGameObjects = objects => {
     this.game.physics.enable(this.badger, __WEBPACK_IMPORTED_MODULE_0_phaser___default.a.Physics.ARCADE);
     this.badger.body.gravity.y = 960;
 
+    game.time.events.loop(__WEBPACK_IMPORTED_MODULE_0_phaser___default.a.Timer.SECOND, this.decreaseStamina.bind(this), this);
+
     this.createNewSection();
+  }
+
+  callGameOver() {
+    this.state.start('Splash');
+  }
+
+  decreaseStamina() {
+    this.badger.stamina -= 10;
+    this.badger.stamina = this.badger.stamina < 0 ? 0 : this.badger.stamina;
+    if (this.badger.stamina === 0) {
+      this.callGameOver();
+    }
+    this.staminaText.setText(`Stamina: ${this.badger.stamina}`);
   }
 
   createNewSection(lastSection = 0) {
@@ -10850,10 +10865,35 @@ const centerGameObjects = objects => {
     hive.body.immovable = true;
   }
 
+  eatSomeFood(badger, food) {
+    food.kill();
+    badger.stamina += 10;
+    badger.stamina = badger.stamina > 100 ? 100 : badger.stamina;
+    if (food.key === 'cobra') {
+      badger.toxication += 25;
+    }
+    if (food.key === 'hive') {
+      badger.toxication -= 50;
+      badger.toxication = badger.toxication < 0 ? 0 : badger.toxication;
+      if (badger.toxication >= 100) {
+        badger.toxication = 100;
+        this.callGameOver();
+      }
+    }
+    this.staminaText.setText(`Stamina: ${badger.stamina}`);
+    this.toxicationText.setText(`Toxication: ${badger.toxication}`);
+  }
+
   update() {
     const cursors = game.input.keyboard.createCursorKeys();
     const hitPlatform = game.physics.arcade.collide(this.badger, this.platforms);
     const hitWall = game.physics.arcade.collide(this.badger, this.walls);
+
+    // console.log(this.timer.duration);
+    // this.timer.elapsedSecondsSince()
+
+    // Badger is always hungry
+    game.physics.arcade.overlap(this.badger, this.food, this.eatSomeFood, null, this);
 
     // Infinite world
     this.world.setBounds(this.badger.xChange, 0, this.game.width + this.badger.xChange, this.game.height);
@@ -10865,10 +10905,6 @@ const centerGameObjects = objects => {
     if (cursors.up.isDown && this.badger.body.touching.down && hitPlatform) {
       this.badger.body.velocity.y = -450;
     }
-
-    // if (cursors.right.isDown && this.badger.body.touching.down) {
-    //   this.badger.body.velocity.x = 320;
-    // }
 
     const lastSection = this.platforms.children[this.platforms.children.length - 1];
     const extraLastSectionX = lastSection.position.x + lastSection.width - this.world.width;
