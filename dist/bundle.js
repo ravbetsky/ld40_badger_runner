@@ -10593,7 +10593,7 @@ class Game extends __WEBPACK_IMPORTED_MODULE_2_phaser___default.a.Game {
     const width = docElement.clientWidth > __WEBPACK_IMPORTED_MODULE_6__config__["a" /* default */].gameWidth ? __WEBPACK_IMPORTED_MODULE_6__config__["a" /* default */].gameWidth : docElement.clientWidth;
     const height = docElement.clientHeight > __WEBPACK_IMPORTED_MODULE_6__config__["a" /* default */].gameHeight ? __WEBPACK_IMPORTED_MODULE_6__config__["a" /* default */].gameHeight : docElement.clientHeight;
 
-    super(width, height, __WEBPACK_IMPORTED_MODULE_2_phaser___default.a.CANVAS, 'content', null);
+    super(width, height, __WEBPACK_IMPORTED_MODULE_2_phaser___default.a.WEBGL, 'content', null, false, false);
 
     this.state.add('Boot', __WEBPACK_IMPORTED_MODULE_3__states_Boot__["a" /* default */], false);
     this.state.add('Splash', __WEBPACK_IMPORTED_MODULE_4__states_Splash__["a" /* default */], false);
@@ -10713,7 +10713,10 @@ if (window.cordova) {
     //
     // load your assets
     //
-    this.load.image('mushroom', 'assets/images/mushroom2.png');
+    this.load.image('badger', 'assets/images/badger.png');
+    this.load.image('ground', 'assets/images/ground.png');
+    this.load.image('sky', 'assets/images/sky.png');
+    this.load.image('wall', 'assets/images/wall.png');
   }
 
   create() {
@@ -10751,7 +10754,7 @@ const centerGameObjects = objects => {
 "use strict";
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0_phaser__ = __webpack_require__(/*! phaser */ 46);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0_phaser___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_0_phaser__);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__sprites_Mushroom__ = __webpack_require__(/*! ../sprites/Mushroom */ 340);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__sprites_Badger__ = __webpack_require__(/*! ../sprites/Badger */ 343);
 /* globals __DEV__ */
 
 
@@ -10761,58 +10764,103 @@ const centerGameObjects = objects => {
   preload() {}
 
   create() {
-    const bannerText = 'Phaser + ES6 + Webpack';
-    let banner = this.add.text(this.world.centerX, this.game.height - 80, bannerText);
-    banner.font = 'Bangers';
-    banner.padding.set(10, 16);
-    banner.fontSize = 40;
-    banner.fill = '#77BFA3';
-    banner.smoothed = false;
-    banner.anchor.setTo(0.5);
+    this.game.antialias = false;
+    this.game.physics.startSystem(__WEBPACK_IMPORTED_MODULE_0_phaser___default.a.Physics.ARCADE);
 
-    this.mushroom = new __WEBPACK_IMPORTED_MODULE_1__sprites_Mushroom__["a" /* default */]({
+    let sky = this.game.add.sprite(0, 0, 'sky');
+    sky.fixedToCamera = true;
+
+    this.platforms = game.add.group();
+    this.platforms.enableBody = true;
+
+    this.walls = game.add.group();
+    this.walls.enableBody = true;
+
+    this.badger = new __WEBPACK_IMPORTED_MODULE_1__sprites_Badger__["a" /* default */]({
       game: this.game,
-      x: this.world.centerX,
-      y: this.world.centerY,
-      asset: 'mushroom'
+      x: this.world.left + 100,
+      y: game.world.height - 100,
+      asset: 'badger'
     });
 
-    this.game.add.existing(this.mushroom);
+    this.ui = game.add.group();
+    this.ui.fixedToCamera = true;
+
+    this.staminaText = game.add.text(16, 16, `Stamina: ${this.badger.stamina}`, { fontSize: '32px', fill: '#000' }, this.ui);
+    this.toxicationText = game.add.text(16, 52, `Toxication: ${this.badger.toxication}`, { fontSize: '32px', fill: '#000' }, this.ui);
+
+    this.game.camera.follow(this.badger);
+    this.game.add.existing(this.badger);
+    this.game.physics.enable(this.badger, __WEBPACK_IMPORTED_MODULE_0_phaser___default.a.Physics.ARCADE);
+    this.badger.body.gravity.y = 960;
+
+    this.createNewSection();
   }
 
-  render() {
-    if (true) {
-      this.game.debug.spriteInfo(this.mushroom, 32, 32);
+  createNewSection(lastSection = 0) {
+    const positionX = lastSection === 0 ? 0 : lastSection.position.x + lastSection.width;
+    let ground = this.platforms.create(positionX, game.world.height - 64, 'ground');
+    ground.proceduralObjects = {
+      walls: [],
+      jerboas: [],
+      hives: [],
+      cobras: []
+    };
+    ground.scale.setTo(2, 2);
+    ground.width = game.width;
+    ground.body.immovable = true;
+    ground.body.setSize(ground.body.width, ground.body.height, 0, 15);
+
+    // Do not run procedural generation for the first section
+    if (lastSection) {
+      this.createWall(game.rnd.between(positionX, positionX + ground.width), ground);
     }
   }
-});
 
-/***/ }),
-/* 340 */
-/*!*********************************!*\
-  !*** ./src/sprites/Mushroom.js ***!
-  \*********************************/
-/*! exports provided: default */
-/*! exports used: default */
-/***/ (function(module, __webpack_exports__, __webpack_require__) {
-
-"use strict";
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0_phaser__ = __webpack_require__(/*! phaser */ 46);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0_phaser___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_0_phaser__);
-
-
-/* harmony default export */ __webpack_exports__["a"] = (class extends __WEBPACK_IMPORTED_MODULE_0_phaser___default.a.Sprite {
-  constructor({ game, x, y, asset }) {
-    super(game, x, y, asset);
-    this.anchor.setTo(0.5);
+  createWall(positionX, ground) {
+    let wall = this.walls.create(positionX, ground.position.y - 55, 'wall');
+    ground.proceduralObjects.walls.push(positionX);
+    wall.body.immovable = true;
   }
 
   update() {
-    this.angle += 1;
+    const cursors = game.input.keyboard.createCursorKeys();
+    const hitPlatform = game.physics.arcade.collide(this.badger, this.platforms);
+    const hitWall = game.physics.arcade.collide(this.badger, this.walls);
+
+    // Infinite world
+    this.world.setBounds(this.badger.xChange, 0, this.game.width + this.badger.xChange, this.game.height);
+
+    // Run badger run
+    this.badger.body.velocity.x = 350;
+
+    // Jump or accelerate
+    if (cursors.up.isDown && this.badger.body.touching.down && hitPlatform) {
+      this.badger.body.velocity.y = -450;
+    }
+
+    // if (cursors.right.isDown && this.badger.body.touching.down) {
+    //   this.badger.body.velocity.x = 320;
+    // }
+
+    const lastSection = this.platforms.children[this.platforms.children.length - 1];
+    const extraLastSectionX = lastSection.position.x + lastSection.width - this.world.width;
+
+    // Run procedural new section
+    if (extraLastSectionX === 0 || extraLastSectionX <= 200) {
+      this.createNewSection(lastSection);
+    }
+  }
+
+  render() {
+    // if (__DEV__) {
+    //   this.game.debug.spriteInfo(this.mushroom, 32, 32)
+    // }
   }
 });
 
 /***/ }),
+/* 340 */,
 /* 341 */
 /*!***********************!*\
   !*** ./src/config.js ***!
@@ -10826,6 +10874,33 @@ const centerGameObjects = objects => {
   gameWidth: 760,
   gameHeight: 400,
   localStorageName: 'phaseres6webpack'
+});
+
+/***/ }),
+/* 342 */,
+/* 343 */
+/*!*******************************!*\
+  !*** ./src/sprites/Badger.js ***!
+  \*******************************/
+/*! exports provided: default */
+/*! exports used: default */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0_phaser__ = __webpack_require__(/*! phaser */ 46);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0_phaser___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_0_phaser__);
+
+
+/* harmony default export */ __webpack_exports__["a"] = (class extends __WEBPACK_IMPORTED_MODULE_0_phaser___default.a.Sprite {
+  constructor({ game, x, y, asset }) {
+    super(game, x, y, asset);
+    this.stamina = 100;
+    this.toxication = 0;
+    this.xChange = 0;
+  }
+  update() {
+    this.xChange += this.deltaX;
+  }
 });
 
 /***/ })
