@@ -10757,17 +10757,25 @@ class ProceduralManager {
       };
     });
   }
-  setLatestSection(key, index) {
-    this.manager[key].latestSection = index;
-  }
-  isAllowedToCreate(key, minInterval, maxInterval, index) {
+  isAllowedToCreate(key, index) {
     const currentLatest = this.manager[key].latestSection;
-    if (maxInterval === index - currentLatest) {
+    const intervalMin = this.manager[key].interval.min;
+    const intervalMax = this.manager[key].interval.max;
+    if (intervalMax === index - currentLatest) {
       return true;
-    } else if (minInterval <= index - currentLatest) {
+    } else if (intervalMin <= index - currentLatest) {
       return Math.round(Math.random());
     }
     return false;
+  }
+  setLatestSection(key, index) {
+    this.manager[key].latestSection = index;
+  }
+  setSecureRange(key, range) {
+    this.manager[key].secureRange = range;
+  }
+  setIntervalToCreate(key, min, max) {
+    this.manager[key].interval = { min, max };
   }
 }
 /* harmony export (immutable) */ __webpack_exports__["a"] = ProceduralManager;
@@ -10795,14 +10803,17 @@ class ProceduralManager {
 
 
 const RUN_VELOCITY_X = 550;
-const JUMP_VELOCITY_X = 350;
+const JUMP_VELOCITY_X = 450;
 const JUMP_VELOCITY_Y = -450;
 const STAMINA_PER_SECOND_DECREASE = 10;
 const COBRA_UP_STAMINA = 50;
 const COBRA_UP_TOXICITY = 25;
 const JEBROA_UP_STAMINA = 15;
 const HIVE_DOWN_TOXICITY = 50;
-const WALL_BIOS_OVERLAP = 2;
+const WALLS_RANGE = 60;
+const JERBOAS_RANGE = 50;
+const HIVES_RANGE = 30;
+const COBRAS_RANGE = 50;
 
 /* harmony default export */ __webpack_exports__["a"] = (class extends __WEBPACK_IMPORTED_MODULE_0_phaser___default.a.State {
   init() {}
@@ -10814,6 +10825,18 @@ const WALL_BIOS_OVERLAP = 2;
     this.game.physics.startSystem(__WEBPACK_IMPORTED_MODULE_0_phaser___default.a.Physics.ARCADE);
 
     this.procData = new __WEBPACK_IMPORTED_MODULE_2__utils__["a" /* ProceduralManager */]('walls', 'jerboas', 'hives', 'cobras');
+
+    this.procData.setSecureRange('walls', 170);
+    this.procData.setIntervalToCreate('walls', 2, 3);
+
+    this.procData.setSecureRange('jerboas', 100);
+    this.procData.setIntervalToCreate('jerboas', 1, 3);
+
+    this.procData.setSecureRange('hives', 50);
+    this.procData.setIntervalToCreate('hives', 7, 10);
+
+    this.procData.setSecureRange('cobras', 150);
+    this.procData.setIntervalToCreate('cobras', 2, 6);
 
     let sky = this.game.add.sprite(0, 0, 'sky');
     sky.fixedToCamera = true;
@@ -10839,6 +10862,7 @@ const WALL_BIOS_OVERLAP = 2;
 
     this.staminaText = game.add.text(16, 16, `Stamina: ${this.badger.stamina}`, { fontSize: '32px', fill: '#000' }, this.ui);
     this.toxicationText = game.add.text(16, 52, `Toxication: ${this.badger.toxication}`, { fontSize: '32px', fill: '#000' }, this.ui);
+    this.scoreText = game.add.text(this.game.width - 170, 16, `Score: ${this.game.score}`, { fontSize: '32px', fill: '#000' }, this.ui);
 
     this.game.camera.follow(this.badger);
     this.game.add.existing(this.badger);
@@ -10861,19 +10885,42 @@ const WALL_BIOS_OVERLAP = 2;
     if (this.badger.stamina === 0) {
       this.callGameOver();
     }
+    this.scoreText.setText(`Score: ${this.game.score}`);
     this.staminaText.setText(`Stamina: ${this.badger.stamina}`);
   }
 
+  isCorrectNewPositionX(positionX, ground) {
+    let result = true;
+    for (let key in ground.proceduralObjects) {
+      if (ground.proceduralObjects[key].length > 0) {
+        const x = ground.proceduralObjects[key][0];
+        const range = this.procData.manager[key].secureRange;
+        if (Math.abs(x - positionX) < range) {
+          result = false;
+        }
+      }
+    }
+    return result;
+  }
+
   getProceduralPoisionX(minX, maxX, ground) {
-    // TODO: поиск наилучшей позиции удовлетворяющей условиям отображения объекта
-    return game.rnd.between(minX + 100, maxX - 100);
+    let random = game.rnd.between(minX, maxX);
+    let limit = 500;
+    while (limit--) {
+      if (this.isCorrectNewPositionX(random, ground)) {
+        break;
+      } else {
+        random = game.rnd.between(minX, maxX);
+      }
+    }
+    return random;
   }
 
   generateProcedural(newGroundRange, ground) {
-    this.createWall(this.getProceduralPoisionX(...newGroundRange), ground);
-    this.createCobra(this.getProceduralPoisionX(...newGroundRange), ground);
-    this.createJerboa(this.getProceduralPoisionX(...newGroundRange), ground);
-    this.createHive(this.getProceduralPoisionX(...newGroundRange), ground);
+    this.createWall(this.getProceduralPoisionX(...newGroundRange, ground), ground);
+    this.createCobra(this.getProceduralPoisionX(...newGroundRange, ground), ground);
+    this.createJerboa(this.getProceduralPoisionX(...newGroundRange, ground), ground);
+    this.createHive(this.getProceduralPoisionX(...newGroundRange, ground), ground);
   }
 
   createNewSection(lastSection = 0) {
@@ -10892,14 +10939,14 @@ const WALL_BIOS_OVERLAP = 2;
 
     // Do not run procedural generation for the first section
     if (lastSection) {
-      const newGroundRange = [positionX, positionX + ground.width];
+      const newGroundRange = [positionX + 50, positionX + ground.width - 50];
       this.generateProcedural(newGroundRange, ground);
     }
   }
 
   createWall(positionX, ground) {
     const lastSectionIndex = this.platforms.children.length - 1;
-    if (this.procData.isAllowedToCreate('walls', 1, 3, lastSectionIndex)) {
+    if (this.procData.isAllowedToCreate('walls', lastSectionIndex)) {
       let wall = this.walls.create(positionX, ground.position.y - 55, 'wall');
       ground.proceduralObjects.walls.push(positionX);
       wall.body.setSize(wall.body.width, wall.body.height, 0, 25);
@@ -10910,7 +10957,7 @@ const WALL_BIOS_OVERLAP = 2;
 
   createCobra(positionX, ground) {
     const lastSectionIndex = this.platforms.children.length - 1;
-    if (this.procData.isAllowedToCreate('cobras', 1, 4, lastSectionIndex)) {
+    if (this.procData.isAllowedToCreate('cobras', lastSectionIndex)) {
       const lastSectionIndex = this.platforms.children.length - 1;
       let cobra = this.food.create(positionX, ground.position.y - 55, 'cobra');
       ground.proceduralObjects.cobras.push(positionX);
@@ -10921,7 +10968,7 @@ const WALL_BIOS_OVERLAP = 2;
 
   createJerboa(positionX, ground) {
     const lastSectionIndex = this.platforms.children.length - 1;
-    if (this.procData.isAllowedToCreate('jerboas', 1, 2, lastSectionIndex)) {
+    if (this.procData.isAllowedToCreate('jerboas', lastSectionIndex)) {
       let jerboa = this.food.create(positionX, ground.position.y - 15, 'jerboa');
       ground.proceduralObjects.jerboas.push(positionX);
       jerboa.body.immovable = true;
@@ -10931,7 +10978,7 @@ const WALL_BIOS_OVERLAP = 2;
 
   createHive(positionX, ground) {
     const lastSectionIndex = this.platforms.children.length - 1;
-    if (this.procData.isAllowedToCreate('hives', 3, 7, lastSectionIndex)) {
+    if (this.procData.isAllowedToCreate('hives', lastSectionIndex)) {
       let hive = this.food.create(positionX, ground.position.y - 125, 'hive');
       ground.proceduralObjects.hives.push(positionX);
       hive.body.immovable = true;
@@ -10996,7 +11043,7 @@ const WALL_BIOS_OVERLAP = 2;
     const extraLastSectionX = lastSection.position.x + lastSection.width - this.world.width;
 
     // Run procedural new section
-    if (extraLastSectionX === 0 || extraLastSectionX <= 200) {
+    if (extraLastSectionX === 0 || extraLastSectionX <= 100) {
       this.createNewSection(lastSection);
     }
   }
@@ -11072,8 +11119,12 @@ const WALL_BIOS_OVERLAP = 2;
     let style = {
       fill: '#000',
       fontSize: '32px'
-      // let text = this.game.add.text(0, 0, `Your Score: ${this.game.score}`, style)
-    };console.log(`Your Score: ${this.game.score}`);
+    };
+    let text = this.game.add.text(370, 200, `Your Score: ${this.game.score}`, style);
+    let textTapToRestart = this.game.add.text(190, 260, `Press any key to restart`, style);
+    textTapToRestart.fixedToCamera = true;
+    text.fixedToCamera = true;
+    text.anchor.setTo(0.5, 0.5);
     this.game.input.keyboard.onDownCallback = e => {
       this.state.start('Game');
       this.game.input.keyboard.onDownCallback = false;

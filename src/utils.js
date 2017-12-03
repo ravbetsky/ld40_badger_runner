@@ -13,17 +13,25 @@ export class ProceduralManager {
       }
     })
   }
-  setLatestSection(key, index) {
-    this.manager[key].latestSection = index
-  }
-  isAllowedToCreate(key, minInterval, maxInterval, index) {
+  isAllowedToCreate(key, index) {
     const currentLatest = this.manager[key].latestSection
-    if(maxInterval === index - currentLatest) {
+    const intervalMin = this.manager[key].interval.min
+    const intervalMax = this.manager[key].interval.max
+    if(intervalMax === index - currentLatest) {
       return true
-    } else if(minInterval <= index - currentLatest) {
+    } else if(intervalMin <= index - currentLatest) {
       return Math.round(Math.random())
     }
     return false
+  }
+  setLatestSection(key, index) {
+    this.manager[key].latestSection = index
+  }
+  setSecureRange(key, range) {
+    this.manager[key].secureRange = range
+  }
+  setIntervalToCreate(key, min, max) {
+    this.manager[key].interval = { min, max }
   }
 }
 
