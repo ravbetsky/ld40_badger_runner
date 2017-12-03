@@ -3,22 +3,26 @@ import Phaser from 'phaser'
 import Badger from '../sprites/Badger'
 import { ProceduralManager } from '../utils'
 
-const RUN_VELOCITY_X = 550;
-const JUMP_VELOCITY_X = 450;
+const RUN_VELOCITY_X = 500;
+const JUMP_VELOCITY_X = 420;
 const JUMP_VELOCITY_Y = -450;
 const STAMINA_PER_SECOND_DECREASE = 10;
 const COBRA_UP_STAMINA = 50;
 const COBRA_UP_TOXICITY = 25;
 const JEBROA_UP_STAMINA = 15;
 const HIVE_DOWN_TOXICITY = 50;
-const WALLS_RANGE = 60;
+const WALLS_RANGE = 1500;
 const JERBOAS_RANGE = 50;
 const HIVES_RANGE = 30;
-const COBRAS_RANGE = 50;
+const COBRAS_RANGE = 80;
+const WALLS_CREATE_INTERVAL = [1, 1];
+const JERBOAS_CREATE_INTERVAL = [1, 1];
+const HIVES_CREATE_INTERVAL = [4, 7];
+const COBRAS_CREATE_INTERVAL = [1, 3];
+const OBJECTS_RANGE_OFFSET = 150;
 
 export default class extends Phaser.State {
   init() {}
-  preload() {}
 
   create() {
     this.game.score = 0
@@ -27,17 +31,17 @@ export default class extends Phaser.State {
 
     this.procData = new ProceduralManager('walls', 'jerboas', 'hives', 'cobras')
 
-    this.procData.setSecureRange('walls', 170)
-    this.procData.setIntervalToCreate('walls', 2, 3)
+    this.procData.setSecureRange('walls', WALLS_RANGE)
+    this.procData.setIntervalToCreate('walls', ...WALLS_CREATE_INTERVAL)
 
-    this.procData.setSecureRange('jerboas', 100)
-    this.procData.setIntervalToCreate('jerboas', 1, 3)
+    this.procData.setSecureRange('jerboas', JERBOAS_RANGE)
+    this.procData.setIntervalToCreate('jerboas', ...JERBOAS_CREATE_INTERVAL)
 
-    this.procData.setSecureRange('hives', 50)
-    this.procData.setIntervalToCreate('hives', 7, 10)
+    this.procData.setSecureRange('hives', HIVES_RANGE)
+    this.procData.setIntervalToCreate('hives', ...HIVES_CREATE_INTERVAL)
 
-    this.procData.setSecureRange('cobras', 150)
-    this.procData.setIntervalToCreate('cobras', 2, 6)
+    this.procData.setSecureRange('cobras', COBRAS_RANGE)
+    this.procData.setIntervalToCreate('cobras', ...COBRAS_CREATE_INTERVAL)
 
     let sky = this.game.add.sprite(0, 0, 'sky');
     sky.fixedToCamera = true;
@@ -55,7 +59,8 @@ export default class extends Phaser.State {
       game: this.game,
       x: this.world.left + 100,
       y: game.world.height - 100,
-      asset: 'badger'
+      asset: 'badger',
+      frame: 0
     })
 
     this.ui = game.add.group();
@@ -106,7 +111,7 @@ export default class extends Phaser.State {
 
   getProceduralPoisionX(minX, maxX, ground) {
     let random = game.rnd.between(minX, maxX)
-    let limit = 500
+    let limit = 500 // If something goes wrong with procedural generation leave currently random :)
     while(limit--) {
       if(this.isCorrectNewPositionX(random, ground)) {
         break
@@ -118,10 +123,10 @@ export default class extends Phaser.State {
   }
 
   generateProcedural(newGroundRange, ground) {
-    this.createWall(this.getProceduralPoisionX(...newGroundRange, ground), ground)
-    this.createCobra(this.getProceduralPoisionX(...newGroundRange, ground), ground)
     this.createJerboa(this.getProceduralPoisionX(...newGroundRange, ground), ground)
     this.createHive(this.getProceduralPoisionX(...newGroundRange, ground), ground)
+    this.createCobra(this.getProceduralPoisionX(...newGroundRange, ground), ground)
+    this.createWall(this.getProceduralPoisionX(...newGroundRange, ground), ground)
   }
 
   createNewSection(lastSection = 0) {
@@ -139,8 +144,8 @@ export default class extends Phaser.State {
     ground.body.setSize(ground.body.width, ground.body.height, 0, 15)
 
     // Do not run procedural generation for the first section
-    if(lastSection) {
-      const newGroundRange = [positionX + 50, positionX + ground.width - 50]
+    if(lastSection !== 0) {
+      const newGroundRange = [positionX + OBJECTS_RANGE_OFFSET, positionX + ground.width - OBJECTS_RANGE_OFFSET]
       this.generateProcedural(newGroundRange, ground)
     }
   }
@@ -148,9 +153,9 @@ export default class extends Phaser.State {
   createWall(positionX, ground) {
     const lastSectionIndex = this.platforms.children.length - 1;
     if(this.procData.isAllowedToCreate('walls', lastSectionIndex)) {
-      let wall = this.walls.create(positionX, ground.position.y - 55, 'wall');
+      let wall = this.walls.create(positionX, ground.position.y - 35, 'wall');
       ground.proceduralObjects.walls.push(positionX)
-      wall.body.setSize(wall.body.width, wall.body.height, 0, 25)
+      // wall.body.setSize(wall.body.width, wall.body.height)
       wall.body.immovable = true;
       this.procData.setLatestSection('walls', lastSectionIndex)
     }
@@ -160,7 +165,9 @@ export default class extends Phaser.State {
     const lastSectionIndex = this.platforms.children.length - 1;
     if(this.procData.isAllowedToCreate('cobras', lastSectionIndex)) {
       const lastSectionIndex = this.platforms.children.length - 1;
-      let cobra = this.food.create(positionX, ground.position.y - 55, 'cobra');
+      let cobra = this.food.create(positionX, ground.position.y - 25, 'cobra');
+      cobra.animations.add('stand', [0, 1, 2], 3, true)
+      cobra.animations.play('stand')
       ground.proceduralObjects.cobras.push(positionX)
       cobra.body.immovable = true;
       this.procData.setLatestSection('cobras', lastSectionIndex)
@@ -170,7 +177,9 @@ export default class extends Phaser.State {
   createJerboa(positionX, ground) {
     const lastSectionIndex = this.platforms.children.length - 1;
     if(this.procData.isAllowedToCreate('jerboas', lastSectionIndex)) {
-      let jerboa = this.food.create(positionX, ground.position.y - 15, 'jerboa');
+      let jerboa = this.food.create(positionX, ground.position.y, 'jerboa');
+      jerboa.animations.add('stand', [0, 1], 3, true)
+      jerboa.animations.play('stand')
       ground.proceduralObjects.jerboas.push(positionX)
       jerboa.body.immovable = true;
       this.procData.setLatestSection('jerboas', lastSectionIndex)
@@ -181,6 +190,9 @@ export default class extends Phaser.State {
     const lastSectionIndex = this.platforms.children.length - 1;
     if(this.procData.isAllowedToCreate('hives', lastSectionIndex)) {
       let hive = this.food.create(positionX, ground.position.y - 125, 'hive');
+      game.add.tween(hive).to({
+        y: hive.position.y + 100
+      }, 2000, Phaser.Easing.Sinusoidal.Linear, true, 0, 10, true);
       ground.proceduralObjects.hives.push(positionX)
       hive.body.immovable = true;
       this.procData.setLatestSection('hives', lastSectionIndex)
@@ -227,11 +239,15 @@ export default class extends Phaser.State {
 
     // Run badger run
     if(hitPlatform) {
+      this.badger.animations.play('run')
       if(this.badger.body.velocity.x !== RUN_VELOCITY_X) {
         this.add.tween(this.badger.body.velocity).to({ x: RUN_VELOCITY_X }, 300, Phaser.Easing.Linear.None, true)
       } else {
         this.badger.body.velocity.x = RUN_VELOCITY_X;
       }
+    } else {
+      this.badger.animations.stop('run')
+      this.badger.frame = 1
     }
 
     // Jump or accelerate
@@ -250,8 +266,5 @@ export default class extends Phaser.State {
   }
 
   render() {
-    // if (__DEV__) {
-    //   this.game.debug.spriteInfo(this.mushroom, 32, 32)
-    // }
   }
 }
