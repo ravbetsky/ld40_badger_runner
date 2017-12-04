@@ -10773,6 +10773,7 @@ if (window.cordova) {
     this.load.spritesheet('jerboa', 'assets/images/jebroa_58x34.png', 58, 34, 2);
     this.load.spritesheet('cobra', 'assets/images/cobra_48x64.png', 48, 64, 3);
     this.load.image('ground', 'assets/images/ground.png');
+    this.load.image('bar', 'assets/images/bar.png');
     this.load.image('sky', 'assets/images/sky.png');
     this.load.image('wall', 'assets/images/wall.png');
     this.load.image('hive', 'assets/images/hive.png');
@@ -10810,20 +10811,25 @@ const COBRA_UP_STAMINA = 50;
 const COBRA_UP_TOXICITY = 25;
 const JEBROA_UP_STAMINA = 15;
 const HIVE_DOWN_TOXICITY = 50;
-const WALLS_RANGE = 1500;
-const JERBOAS_RANGE = 50;
-const HIVES_RANGE = 30;
-const COBRAS_RANGE = 80;
+const WALLS_RANGE = 150;
+const JERBOAS_RANGE = 70;
+const HIVES_RANGE = 70;
+const COBRAS_RANGE = 70;
 const WALLS_CREATE_INTERVAL = [1, 1];
 const JERBOAS_CREATE_INTERVAL = [1, 1];
 const HIVES_CREATE_INTERVAL = [4, 7];
 const COBRAS_CREATE_INTERVAL = [1, 3];
 const OBJECTS_RANGE_OFFSET = 150;
 
+if (WALLS_RANGE * 2 + JERBOAS_RANGE * 2 + HIVES_RANGE * 2 + COBRAS_RANGE * 2 > 760) {
+  throw WALLS_RANGE * 2 + JERBOAS_RANGE * 2 + HIVES_RANGE * 2 + COBRAS_RANGE * 2 + ' impossible params';
+}
+
 /* harmony default export */ __webpack_exports__["a"] = (class extends __WEBPACK_IMPORTED_MODULE_0_phaser___default.a.State {
   init() {}
 
   create() {
+    this.localStorage = localStorage;
     this.game.score = 0;
     this.game.antialias = false;
     this.game.physics.startSystem(__WEBPACK_IMPORTED_MODULE_0_phaser___default.a.Physics.ARCADE);
@@ -10865,23 +10871,26 @@ const OBJECTS_RANGE_OFFSET = 150;
     this.ui = game.add.group();
     this.ui.fixedToCamera = true;
 
+    let bgForStamina = this.ui.create(26, 24, 'bar');
     this.staminaBar = this.game.make.graphics(32, 32);
     this.staminaBar.beginFill(0xff0000, 0.7);
-    this.staminaBar.drawRect(0, 0, 200, 20);
+    this.staminaBar.drawRect(0, 0, 200, 30);
     this.ui.add(this.staminaBar);
 
-    this.toxicationBar = this.game.make.graphics(32, 68);
+    let bgForToxication = this.ui.create(26, 70, 'bar');
+    this.toxicationBar = this.game.make.graphics(32, 78);
     this.toxicationBar.beginFill(0x00ff2f, 0.7);
-    this.toxicationBar.drawRect(0, 0, 200, 20);
+    this.toxicationBar.drawRect(0, 0, 200, 30);
     this.toxicationBar.width = 0;
     this.ui.add(this.toxicationBar);
 
-    this.scoreText = game.add.text(this.game.width - 170, 16, `Score: ${this.game.score}`, { fontSize: '32px', fill: '#000' }, this.ui);
+    this.scoreText = game.add.text(this.game.width - 170, 16, `Score: ${this.game.score}`, { fontSize: '32px', fill: '#fff' }, this.ui);
+    this.highscoreText = game.add.text(this.game.width - 200, 52, `High score: ${this.localStorage.getItem("highscore") === null ? 0 : this.localStorage.getItem("highscore")}`, { fontSize: '24px', fill: '#fff' }, this.ui);
 
     this.game.camera.follow(this.badger);
     this.game.add.existing(this.badger);
     this.game.physics.enable(this.badger, __WEBPACK_IMPORTED_MODULE_0_phaser___default.a.Physics.ARCADE);
-    this.badger.body.setSize(this.badger.body.width, this.badger.body.height, 5, 5);
+    this.badger.body.setSize(this.badger.body.width, this.badger.body.height, -20, 0);
     this.badger.body.gravity.y = 960;
 
     game.time.events.loop(__WEBPACK_IMPORTED_MODULE_0_phaser___default.a.Timer.SECOND, this.calculateStaminaAndScore.bind(this), this);
@@ -10896,7 +10905,13 @@ const OBJECTS_RANGE_OFFSET = 150;
   }
 
   callGameOver() {
-    this.state.start('GameOver');
+    if (this.localStorage.getItem("highscore") === null) {
+      localStorage.setItem("highscore", this.game.score);
+    }
+    if (this.game.score > this.localStorage.getItem("highscore")) {
+      localStorage.setItem("highscore", this.game.score);
+    }
+    this.state.restart('Game');
   }
 
   calculateStaminaAndScore() {
@@ -10924,13 +10939,13 @@ const OBJECTS_RANGE_OFFSET = 150;
   }
 
   getProceduralPoisionX(minX, maxX, ground) {
-    let random = game.rnd.between(minX, maxX);
+    let random = game.rnd.integerInRange(minX, maxX);
     let limit = 500; // If something goes wrong with procedural generation leave currently random :)
     while (limit--) {
       if (this.isCorrectNewPositionX(random, ground)) {
         break;
       } else {
-        random = game.rnd.between(minX, maxX);
+        random = game.rnd.integerInRange(minX, maxX);
       }
     }
     return random;
@@ -10969,7 +10984,7 @@ const OBJECTS_RANGE_OFFSET = 150;
     if (this.procData.isAllowedToCreate('walls', lastSectionIndex)) {
       let wall = this.walls.create(positionX, ground.position.y - 35, 'wall');
       ground.proceduralObjects.walls.push(positionX);
-      // wall.body.setSize(wall.body.width, wall.body.height)
+      wall.body.setSize(wall.body.width, wall.body.height, 0, 15);
       wall.body.immovable = true;
       this.procData.setLatestSection('walls', lastSectionIndex);
     }
@@ -11133,10 +11148,6 @@ const OBJECTS_RANGE_OFFSET = 150;
     textTapToRestart.fixedToCamera = true;
     text.fixedToCamera = true;
     text.anchor.setTo(0.5, 0.5);
-    this.game.input.keyboard.onDownCallback = e => {
-      this.state.start('Game');
-      this.game.input.keyboard.onDownCallback = false;
-    };
   }
 });
 

@@ -11,9 +11,5 @@ export default class extends Phaser.State {
     textTapToRestart.fixedToCamera = true;
     text.fixedToCamera = true;
     text.anchor.setTo(0.5, 0.5)
-    this.game.input.keyboard.onDownCallback = (e) => {
-      this.state.start('Game')
-      this.game.input.keyboard.onDownCallback = false
-    }
   }
 }
