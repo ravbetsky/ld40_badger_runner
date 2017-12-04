@@ -4,7 +4,7 @@ import Badger from '../sprites/Badger'
 import { ProceduralManager } from '../utils'
 
 const RUN_VELOCITY_X = 500;
-const JUMP_VELOCITY_X = 420;
+const JUMP_VELOCITY_X = 370;
 const JUMP_VELOCITY_Y = -450;
 const STAMINA_PER_SECOND_DECREASE = 10;
 const COBRA_UP_STAMINA = 50;
@@ -66,18 +66,34 @@ export default class extends Phaser.State {
     this.ui = game.add.group();
     this.ui.fixedToCamera = true;
 
-    this.staminaText = game.add.text(16, 16, `Stamina: ${this.badger.stamina}`, { fontSize: '32px', fill: '#000' }, this.ui);
-    this.toxicationText = game.add.text(16, 52, `Toxication: ${this.badger.toxication}`, { fontSize: '32px', fill: '#000' }, this.ui);
+    this.staminaBar = this.game.make.graphics(32, 32)
+    this.staminaBar.beginFill(0xff0000, 0.7);
+    this.staminaBar.drawRect(0, 0, 200, 20);
+    this.ui.add(this.staminaBar)
+
+    this.toxicationBar = this.game.make.graphics(32, 68)
+    this.toxicationBar.beginFill(0x00ff2f, 0.7);
+    this.toxicationBar.drawRect(0, 0, 200, 20);
+    this.toxicationBar.width = 0
+    this.ui.add(this.toxicationBar)
+
     this.scoreText = game.add.text(this.game.width - 170, 16, `Score: ${this.game.score}`, { fontSize: '32px', fill: '#000' }, this.ui);
 
     this.game.camera.follow(this.badger);
     this.game.add.existing(this.badger);
     this.game.physics.enable(this.badger, Phaser.Physics.ARCADE);
+    this.badger.body.setSize(this.badger.body.width, this.badger.body.height, 5, 5)
     this.badger.body.gravity.y = 960;
 
     game.time.events.loop(Phaser.Timer.SECOND, this.calculateStaminaAndScore.bind(this), this);
 
     this.createNewSection()
+  }
+
+  updateUI() {
+    this.scoreText.setText(`Score: ${this.game.score}`)
+    this.toxicationBar.width = this.badger.toxication * 2
+    this.staminaBar.width = this.badger.stamina * 2
   }
 
   callGameOver() {
@@ -91,8 +107,7 @@ export default class extends Phaser.State {
     if(this.badger.stamina === 0) {
       this.callGameOver()
     }
-    this.scoreText.setText(`Score: ${this.game.score}`);
-    this.staminaText.setText(`Stamina: ${this.badger.stamina}`);
+    this.updateUI()
   }
 
   isCorrectNewPositionX(positionX, ground) {
@@ -220,8 +235,7 @@ export default class extends Phaser.State {
     if(badger.toxication >= 100) {
       this.callGameOver()
     }
-    this.staminaText.setText(`Stamina: ${badger.stamina}`)
-    this.toxicationText.setText(`Toxication: ${badger.toxication}`)
+    this.updateUI()
   }
 
   update() {
