@@ -10808,9 +10808,9 @@ const JUMP_VELOCITY_X = 370;
 const JUMP_VELOCITY_Y = -450;
 const STAMINA_PER_SECOND_DECREASE = 10;
 const COBRA_UP_STAMINA = 50;
-const COBRA_UP_TOXICITY = 25;
+const COBRA_UP_TOXICITY = 20;
 const JEBROA_UP_STAMINA = 15;
-const HIVE_DOWN_TOXICITY = 50;
+const HIVE_DOWN_TOXICITY = 60;
 const WALLS_RANGE = 150;
 const JERBOAS_RANGE = 70;
 const HIVES_RANGE = 70;
@@ -11037,7 +11037,7 @@ if (WALLS_RANGE * 2 + JERBOAS_RANGE * 2 + HIVES_RANGE * 2 + COBRAS_RANGE * 2 > 7
       badger.stamina += COBRA_UP_STAMINA;
       badger.toxication += COBRA_UP_TOXICITY;
     }
-    if (food.key === 'jebroa') {
+    if (food.key === 'jerboa') {
       badger.stamina += JEBROA_UP_STAMINA;
     }
     if (food.key === 'hive') {
